@@ -1,0 +1,854 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Agent 学习地图 · AI 私厨项目</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f3ec;
+      --panel: #fffdf9;
+      --panel-2: #fff8ee;
+      --text: #2b241f;
+      --muted: #756b61;
+      --line: #e8dbcb;
+      --accent: #d95b23;
+      --accent-2: #0f766e;
+      --code: #202124;
+      --code-soft: #2b2e32;
+      --good: #0f7a4f;
+      --warn: #aa5b00;
+      --shadow: 0 18px 60px rgba(72, 45, 20, .12);
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font: 15px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 12% 0%, rgba(217, 91, 35, .10), transparent 28rem),
+        linear-gradient(180deg, #fff8ed 0%, var(--bg) 34rem);
+    }
+
+    a { color: inherit; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+
+    .shell {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 30px 0 70px;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 14px 0;
+      backdrop-filter: blur(18px);
+      background: rgba(247, 243, 236, .76);
+      border-bottom: 1px solid rgba(232, 219, 203, .76);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      letter-spacing: .02em;
+    }
+
+    .mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 10px;
+      color: #fff;
+      background: linear-gradient(135deg, #e36525, #bf3d17);
+      box-shadow: 0 12px 28px rgba(217, 91, 35, .24);
+    }
+
+    .nav {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .nav a, .ghost-btn, .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      background: rgba(255, 253, 249, .72);
+      text-decoration: none;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .nav a:hover, .ghost-btn:hover { color: var(--accent); border-color: rgba(217, 91, 35, .35); }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(320px, .95fr);
+      gap: 26px;
+      align-items: center;
+      padding: 58px 0 38px;
+    }
+
+    h1 {
+      max-width: 760px;
+      margin: 0 0 18px;
+      font-size: clamp(34px, 5vw, 66px);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .lead {
+      max-width: 710px;
+      margin: 0 0 24px;
+      color: var(--muted);
+      font-size: 18px;
+    }
+
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+
+    .primary-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 42px;
+      padding: 0 16px;
+      border: 0;
+      border-radius: 8px;
+      color: #fff;
+      background: var(--accent);
+      text-decoration: none;
+      font-weight: 760;
+      box-shadow: 0 14px 30px rgba(217, 91, 35, .22);
+      cursor: pointer;
+    }
+
+    .terminal-card {
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, .7);
+      border-radius: 10px;
+      background: var(--code);
+      color: #e8eaed;
+      box-shadow: var(--shadow);
+    }
+
+    .terminal-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 14px;
+      background: #2f3337;
+      border-bottom: 1px solid rgba(255, 255, 255, .08);
+    }
+
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #ff5f56; }
+    .dot:nth-child(2) { background: #ffbd2e; }
+    .dot:nth-child(3) { background: #27c93f; }
+    .terminal-title { margin-left: 8px; color: #bdc1c6; font-size: 12px; }
+    .terminal-body { padding: 18px; }
+    .prompt { color: #8ab4f8; }
+    .comment { color: #9aa0a6; }
+    .ok { color: #81c995; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 16px;
+    }
+
+    section { scroll-margin-top: 88px; }
+
+    .section-title {
+      margin: 44px 0 14px;
+      font-size: 28px;
+      line-height: 1.25;
+    }
+
+    .section-note {
+      max-width: 820px;
+      margin: 0 0 18px;
+      color: var(--muted);
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 253, 249, .86);
+      box-shadow: 0 10px 32px rgba(72, 45, 20, .06);
+    }
+
+    .card-pad { padding: 18px; }
+    .span-3 { grid-column: span 3; }
+    .span-4 { grid-column: span 4; }
+    .span-5 { grid-column: span 5; }
+    .span-6 { grid-column: span 6; }
+    .span-7 { grid-column: span 7; }
+    .span-8 { grid-column: span 8; }
+    .span-12 { grid-column: span 12; }
+
+    .metric {
+      display: flex;
+      flex-direction: column;
+      min-height: 132px;
+      gap: 10px;
+    }
+
+    .metric b { font-size: 18px; }
+    .metric span { color: var(--muted); }
+
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .node {
+      min-height: 112px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      cursor: pointer;
+      transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+    }
+
+    .node:hover, .node.active {
+      transform: translateY(-2px);
+      border-color: rgba(217, 91, 35, .45);
+      box-shadow: 0 12px 30px rgba(217, 91, 35, .12);
+    }
+
+    .node small {
+      display: block;
+      color: var(--accent);
+      font-weight: 760;
+      margin-bottom: 7px;
+    }
+
+    .node b { display: block; font-size: 16px; line-height: 1.25; }
+    .node p { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+
+    .detail {
+      margin-top: 12px;
+      min-height: 150px;
+      padding: 18px;
+      border-radius: 8px;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+    }
+
+    .detail h3 { margin: 0 0 8px; }
+    .detail p { margin: 0 0 10px; color: var(--muted); }
+
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .tab {
+      height: 36px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      background: var(--panel);
+      cursor: pointer;
+    }
+
+    .tab.active {
+      color: #fff;
+      border-color: var(--accent);
+      background: var(--accent);
+    }
+
+    .code-panel {
+      display: none;
+      overflow: auto;
+      max-height: 520px;
+      margin: 0;
+      padding: 18px;
+      border-radius: 8px;
+      color: #e8eaed;
+      background: var(--code);
+      line-height: 1.65;
+      font-size: 13px;
+    }
+
+    .code-panel.active { display: block; }
+
+    .callout {
+      padding: 14px 16px;
+      border-left: 4px solid var(--accent-2);
+      border-radius: 8px;
+      background: #eef8f6;
+      color: #17423e;
+    }
+
+    .compare {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .compare th, .compare td {
+      padding: 12px 13px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .compare th { background: #fff4e8; }
+    .compare tr:last-child td { border-bottom: 0; }
+
+    .timeline {
+      display: grid;
+      gap: 10px;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .badge {
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 9px;
+      color: #fff;
+      background: var(--accent-2);
+      font-weight: 800;
+    }
+
+    .step h3 { margin: 0 0 4px; font-size: 16px; }
+    .step p { margin: 0; color: var(--muted); }
+
+    .quiz-option {
+      display: block;
+      width: 100%;
+      margin: 8px 0;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+    }
+
+    .quiz-option.correct { border-color: rgba(15, 122, 79, .5); background: #ecf8f2; }
+    .quiz-option.wrong { border-color: rgba(170, 91, 0, .5); background: #fff2df; }
+    .quiz-result { min-height: 28px; margin-top: 8px; color: var(--muted); }
+
+    .checklist label {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .checklist label:last-child { border-bottom: 0; }
+    .checklist input { margin-top: 6px; }
+    .checklist span { color: var(--muted); }
+
+    .footer {
+      margin-top: 54px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    /* 游戏化学习层 */
+    .game-hud { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin: 18px 0 8px; }
+    .hud-card { padding:10px 14px; border:1px solid var(--line); border-radius:10px; background:var(--panel); }
+    .xp-track { width:150px; height:8px; margin-top:5px; overflow:hidden; border-radius:99px; background:#eadfd4; }
+    .xp-track span { display:block; width:0; height:100%; border-radius:99px; background:linear-gradient(90deg,var(--accent),#f3a23c); transition:width .3s ease; }
+    .mission-board { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:18px 0 28px; }
+    .mission { position:relative; padding:16px; border:1px solid var(--line); border-radius:10px; background:var(--panel); }
+    .mission.locked { opacity:.55; filter:grayscale(.25); }
+    .mission.done { border-color:rgba(15,122,79,.5); background:#f1fbf6; }
+    .mission button { margin-top:10px; border:0; border-radius:7px; padding:8px 11px; color:#fff; background:var(--accent); cursor:pointer; }
+    .mission button:disabled { cursor:not-allowed; background:#b8ada2; }
+    .skill-list { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .skill { padding:5px 9px; border-radius:99px; color:var(--muted); background:#eee7df; font-size:12px; }
+    .skill.unlocked { color:#fff; background:var(--accent-2); }
+    @media (max-width: 760px) { .mission-board { grid-template-columns:1fr; } }
+
+    @media (max-width: 960px) {
+      .hero { grid-template-columns: 1fr; }
+      .flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .span-3, .span-4, .span-5, .span-6, .span-7, .span-8 { grid-column: span 12; }
+      .topbar { align-items: flex-start; flex-direction: column; }
+      .nav { justify-content: flex-start; }
+    }
+
+    @media (max-width: 560px) {
+      .shell { width: min(100% - 20px, 1180px); }
+      .flow { grid-template-columns: 1fr; }
+      .compare { font-size: 13px; }
+      .compare th, .compare td { padding: 9px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark">AI</div>
+        <div>
+          <div>AI 私厨项目学习地图</div>
+          <small style="color: var(--muted); font-weight: 600;">Python · LangChain · Tools · Agent Runtime</small>
+        </div>
+      </div>
+      <nav class="nav" aria-label="学习导航">
+        <a href="#map">执行链路</a>
+        <a href="#concepts">概念卡片</a>
+        <a href="#code">代码导读</a>
+        <a href="#pitfalls">踩坑复盘</a>
+        <a href="#quiz">自测</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="game-hud" aria-label="学习进度">
+        <div class="hud-card"><small style="color:var(--muted)">当前等级</small><br><b id="playerLevel">Agent 学徒 · Lv.1</b></div>
+        <div class="hud-card"><small style="color:var(--muted)">经验值</small><br><b><span id="xpValue">0</span> XP</b><div class="xp-track"><span id="xpBar"></span></div></div>
+        <div class="hud-card"><small style="color:var(--muted)">已完成任务</small><br><b id="missionCount">0 / 6</b></div>
+        <button class="ghost-btn" id="resetGame" type="button">重置存档</button>
+      </section>
+      <section class="hero">
+        <div>
+          <span class="pill">面向资深前端转 AI Agent</span>
+          <h1>把一个 AI 私厨项目拆成可学习的 Agent 系统</h1>
+          <p class="lead">
+            这个页面把项目从“能跑”拆成“看得懂”：请求怎么进入 FastAPI，图片如何进入视觉模型，LangChain Agent 何时决定调工具，Tavily 返回结果如何变成最终回答，以及会话记忆为什么会影响下一轮。
+          </p>
+          <div class="hero-actions">
+            <a class="primary-btn" href="#map">从执行链路开始</a>
+            <a class="ghost-btn" href="/">回到 AI 私厨 Demo</a>
+          </div>
+        </div>
+        <div class="terminal-card" aria-label="项目启动命令">
+          <div class="terminal-head">
+            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            <span class="terminal-title">run-local.zsh</span>
+          </div>
+          <pre class="terminal-body"><code><span class="comment"># 从项目根目录进入 src/app</span>
+<span class="prompt">cd</span> src/app
+
+<span class="comment"># 让 Python 能找到顶层 app 包</span>
+<span class="prompt">PYTHONPATH=..</span> ../../.venv/bin/python -m uvicorn app.main:app \
+  --host 127.0.0.1 \
+  --port 8001
+
+<span class="ok"># http://127.0.0.1:8001</span></code></pre>
+        </div>
+      </section>
+
+      <section id="missions">
+        <h2 class="section-title">Agent 冒险任务</h2>
+        <p class="section-note">任选一个已解锁任务开始。完成挑战会获得经验，并解锁新的 Agent 技能。</p>
+        <div class="mission-board" id="missionBoard"></div>
+        <div class="card card-pad"><b>技能树</b><div class="skill-list" id="skillList"></div></div>
+      </section>
+
+      <section id="overview">
+        <h2 class="section-title">你应该怎么学这个项目</h2>
+        <p class="section-note">
+          前端工程师看 Agent 项目时，不要先陷进模型名和参数。先把它当成一个“异步后端编排系统”：输入、状态、工具、模型、输出流，这五件事理清以后，再看 LangChain 的抽象就会顺很多。
+        </p>
+        <div class="grid">
+          <div class="card card-pad span-3 metric">
+            <b>输入层</b>
+            <span>浏览器收集文字和图片，图片先上传 OSS，再把 URL 发给后端。</span>
+          </div>
+          <div class="card card-pad span-3 metric">
+            <b>服务层</b>
+            <span>FastAPI 暴露 `/api/v1/chat/stream`，用 StreamingResponse 持续吐 token。</span>
+          </div>
+          <div class="card card-pad span-3 metric">
+            <b>Agent 层</b>
+            <span>LangChain 创建 Agent，把模型、工具、系统提示词和记忆组合起来。</span>
+          </div>
+          <div class="card card-pad span-3 metric">
+            <b>状态层</b>
+            <span>LangGraph SQLite Checkpointer 记录 thread_id 对应的对话历史。</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="map">
+        <h2 class="section-title">交互式执行链路</h2>
+        <p class="section-note">点击每个节点，看它在这个项目里对应哪个文件、承担什么职责，以及你作为前端工程师可以类比成什么。</p>
+        <div class="flow" id="flow">
+          <button class="node active" data-flow="browser"><small>01</small><b>浏览器 UI</b><p>选择图片、输入需求、展示流式回复</p></button>
+          <button class="node" data-flow="oss"><small>02</small><b>OSS 上传</b><p>预签名 URL，浏览器直传文件</p></button>
+          <button class="node" data-flow="api"><small>03</small><b>FastAPI</b><p>接收 ChatRequest，返回文本流</p></button>
+          <button class="node" data-flow="vision"><small>04</small><b>视觉识别</b><p>后端下载图片，Base64 传模型</p></button>
+          <button class="node" data-flow="agent"><small>05</small><b>Agent 决策</b><p>模型根据提示词决定是否调工具</p></button>
+          <button class="node" data-flow="memory"><small>06</small><b>会话记忆</b><p>SQLite 保存 thread 状态</p></button>
+        </div>
+        <div class="detail" id="flowDetail"></div>
+      </section>
+
+      <section id="concepts">
+        <h2 class="section-title">核心概念卡片</h2>
+        <div class="grid">
+          <div class="card card-pad span-4">
+            <h3>Python 对你来说是什么</h3>
+            <p>这里的 Python 主要不是算法语言，而是后端编排语言：定义接口、读环境变量、调用 SDK、处理异步请求、组织模型调用。</p>
+            <div class="callout">类比前端：FastAPI 路由像 Next.js API Route；Pydantic Model 像运行时 DTO 校验；async 函数像浏览器里的 Promise 链。</div>
+          </div>
+          <div class="card card-pad span-4">
+            <h3>LangChain Agent 是什么</h3>
+            <p>Agent 不是一个神秘实体。它本质上是“模型 + 工具列表 + 系统提示词 + 状态管理”的运行循环。</p>
+            <div class="callout">模型负责判断下一步；工具负责连接外部能力；checkpointer 负责保存上下文。</div>
+          </div>
+          <div class="card card-pad span-4">
+            <h3>工具调用是什么</h3>
+            <p>TavilySearch 被注册成工具后，模型可以输出 tool call，LangChain 执行工具，再把工具结果送回模型继续生成。</p>
+            <div class="callout">注意：模型说“我将调用工具”不等于真的调用。要看日志里的 ToolMessage 或实际 HTTP 请求。</div>
+          </div>
+        </div>
+      </section>
+
+      <section id="code">
+        <h2 class="section-title">代码导读</h2>
+        <p class="section-note">这里把最关键的代码按学习顺序拆开。先看入口和数据流，再看 Agent，不要反过来。</p>
+        <div class="card card-pad">
+          <div class="tabs" role="tablist">
+            <button class="tab active" data-tab="main">main.py</button>
+            <button class="tab" data-tab="schema">schemas.py</button>
+            <button class="tab" data-tab="chat">chat.py</button>
+            <button class="tab" data-tab="oss">oss.py</button>
+            <button class="tab" data-tab="agent">personal_chief.py</button>
+          </div>
+
+          <pre class="code-panel active" data-panel="main"><code># src/app/main.py
+app = FastAPI(...)
+
+app.add_middleware(CORSMiddleware, allow_origins=["*"])
+
+app.include_router(chat.router, prefix="/api/v1", tags=["对话"])
+app.include_router(oss.router, prefix="/api/v1", tags=["申请上传签名url"])
+
+app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
+
+学习重点：
+1. FastAPI app 是整个后端入口。
+2. include_router 把业务接口挂到 /api/v1。
+3. StaticFiles 让后端同时托管前端页面。
+4. 对前端来说，这相当于一个本地 BFF + 静态资源服务器。</code></pre>
+
+          <pre class="code-panel" data-panel="schema"><code># src/app/models/schemas.py
+class ChatRequest(BaseModel):
+    message: str
+    image_url: Optional[str] = None
+    thread_id: str
+
+学习重点：
+1. Pydantic 负责请求体结构校验。
+2. thread_id 是会话记忆的关键索引。
+3. image_url 可空，所以纯文本聊天和图片聊天走同一个接口。</code></pre>
+
+          <pre class="code-panel" data-panel="chat"><code># src/app/api/v1/chat.py
+@router.post("/chat/stream")
+async def chat_endpoint(request: ChatRequest):
+    return StreamingResponse(
+        search_recipes(request.message, request.image_url, request.thread_id),
+        media_type="text/event-stream"
+    )
+
+学习重点：
+1. search_recipes 是 async generator。
+2. StreamingResponse 会把 yield 出来的文本持续推给浏览器。
+3. 这就是页面里“边生成边显示”的来源。</code></pre>
+
+          <pre class="code-panel" data-panel="oss"><code># src/app/api/v1/oss.py
+client = oss.Client(cfg)
+
+@router.get("/oss/presign")
+def chat_endpoint(filename: str):
+    pre_result = client.presign(
+        oss.PutObjectRequest(bucket=OSS_BUCKET, key=filename, content_type=content_type),
+        expires=timedelta(seconds=3600)
+    )
+    return {
+        "uploadUrl": pre_result.url.strip('"'),
+        "contentType": content_type,
+        "accessUrl": f"https://{OSS_BUCKET}.{OSS_ENDPOINT}/{filename}"
+    }
+
+学习重点：
+1. 后端不直接接收图片文件，而是签一个临时上传地址。
+2. 浏览器拿 uploadUrl 直接 PUT 到 OSS。
+3. accessUrl 再作为图片地址传给聊天接口。</code></pre>
+
+          <pre class="code-panel" data-panel="agent"><code># src/app/agents/personal_chief.py
+web_search = TavilySearch(max_results=5, topic="general")
+
+model = init_chat_model(
+    model=os.getenv("ALIBABA_MODEL", "qwen-vl-plus"),
+    model_provider="openai",
+    base_url=os.getenv("ALIBABA_API_URL"),
+    api_key=os.getenv("ALIBABA_API_KEY")
+)
+
+agent = create_agent(
+    model=model,
+    tools=[web_search],
+    system_prompt=system_prompt,
+    checkpointer=checkpointer
+)
+
+async def search_recipes(prompt, image, thread_id):
+    if image:
+        ingredients = await identify_ingredients(image)
+        message = HumanMessage(content=f"...{ingredients}...")
+    else:
+        message = HumanMessage(content=prompt)
+
+    for chunk, metadata in agent.stream(...):
+        if isinstance(chunk, AIMessageChunk) and chunk.content:
+            yield chunk.content
+
+学习重点：
+1. 视觉识别和 Agent 搜菜谱被拆成两段。
+2. 工具只是注册给 Agent，是否调用由模型决定。
+3. checkpointer 让同一个 thread_id 保持上下文。</code></pre>
+        </div>
+      </section>
+
+      <section id="pitfalls">
+        <h2 class="section-title">这个项目最值得学的坑</h2>
+        <p class="section-note">这些比“能跑起来”更重要，因为真实 Agent 开发大多卡在边界和状态上。</p>
+        <div class="grid">
+          <div class="card card-pad span-6">
+            <h3>图片 URL 不等于模型能访问</h3>
+            <p>浏览器能打开、后端能 curl，不代表模型服务端能下载。OSS 默认域名、ACL、强制下载、防盗链、签名过期都可能影响模型侧下载。</p>
+            <table class="compare">
+              <tr><th>方案</th><th>稳定性</th><th>代价</th></tr>
+              <tr><td>直接传 OSS URL</td><td>依赖外部可访问性</td><td>链路简单，但调试不稳定</td></tr>
+              <tr><td>后端转 Base64</td><td>更稳定</td><td>请求体更大，后端多一次下载</td></tr>
+              <tr><td>自定义域名/CDN</td><td>适合生产</td><td>需要配置域名、缓存、权限</td></tr>
+            </table>
+          </div>
+          <div class="card card-pad span-6">
+            <h3>历史记忆会污染新请求</h3>
+            <p>LangGraph 会把 thread_id 下的历史带入下一轮。如果历史里残留旧图片消息，即使你新代码已经改成 Base64，模型仍可能收到旧 URL 并报错。</p>
+            <div class="callout">本项目用了 `thread_id:agent-text` 隔离 Agent 文本记忆，避免旧的多模态消息继续进入后续请求。</div>
+          </div>
+          <div class="card card-pad span-6">
+            <h3>“说调用工具”不等于真的调用</h3>
+            <p>Agent 的关键证据不是最终文本，而是运行日志里的 tool call、ToolMessage 或外部服务请求。现在代码里已经加了 `[工具调用中]` 和 `[工具调用结果]` 日志。</p>
+          </div>
+          <div class="card card-pad span-6">
+            <h3>模型会编造链接</h3>
+            <p>当提示词要求“参考图片”但搜索结果没有真实图片 URL 时，模型可能输出 `example.com`。后端要约束，前端也要过滤占位链接。</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="runtime">
+        <h2 class="section-title">一次完整请求的运行时顺序</h2>
+        <div class="timeline">
+          <div class="step"><div class="badge">1</div><div><h3>用户选择图片</h3><p>`app.js` 创建本地预览 blob，同时请求 `/api/v1/oss/presign`。</p></div></div>
+          <div class="step"><div class="badge">2</div><div><h3>浏览器上传 OSS</h3><p>浏览器使用后端返回的 `uploadUrl` 执行 PUT 上传，成功后得到 `accessUrl`。</p></div></div>
+          <div class="step"><div class="badge">3</div><div><h3>发起聊天流</h3><p>前端 POST `/api/v1/chat/stream`，提交 `message`、`image_url`、`thread_id`。</p></div></div>
+          <div class="step"><div class="badge">4</div><div><h3>后端视觉识别</h3><p>`identify_ingredients()` 下载图片并转成 Base64，调用视觉模型得到食材清单。</p></div></div>
+          <div class="step"><div class="badge">5</div><div><h3>Agent 生成推荐</h3><p>Agent 收到文字化食材清单，理论上可调用 Tavily，再把结果整理成菜谱。</p></div></div>
+          <div class="step"><div class="badge">6</div><div><h3>前端流式渲染</h3><p>`ReadableStream` 持续读取 chunk，增量更新 assistant 气泡。</p></div></div>
+        </div>
+      </section>
+
+      <section id="quiz">
+        <h2 class="section-title">自测：确认你真的理解了</h2>
+        <div class="grid">
+          <div class="card card-pad span-6 quiz" data-answer="b">
+            <h3>1. 为什么后来要把图片转 Base64？</h3>
+            <button class="quiz-option" data-value="a">因为 OSS 上传失败了</button>
+            <button class="quiz-option" data-value="b">因为模型服务端下载 OSS 图片不稳定</button>
+            <button class="quiz-option" data-value="c">因为 FastAPI 不能处理图片 URL</button>
+            <div class="quiz-result"></div>
+          </div>
+          <div class="card card-pad span-6 quiz" data-answer="c">
+            <h3>2. 怎样判断 Tavily 是否真的被调用？</h3>
+            <button class="quiz-option" data-value="a">看模型是否说“我将搜索”</button>
+            <button class="quiz-option" data-value="b">看页面是否出现“检索结果摘要”</button>
+            <button class="quiz-option" data-value="c">看工具调用日志、ToolMessage 或实际网络请求</button>
+            <div class="quiz-result"></div>
+          </div>
+          <div class="card card-pad span-6 quiz" data-answer="a">
+            <h3>3. thread_id 在这个项目里的核心作用是什么？</h3>
+            <button class="quiz-option" data-value="a">作为 LangGraph 记忆的会话索引</button>
+            <button class="quiz-option" data-value="b">作为 OSS 文件名</button>
+            <button class="quiz-option" data-value="c">作为模型 API Key</button>
+            <div class="quiz-result"></div>
+          </div>
+          <div class="card card-pad span-6 quiz" data-answer="b">
+            <h3>4. Agent 的最小组成更接近哪一个？</h3>
+            <button class="quiz-option" data-value="a">一个更大的 Prompt</button>
+            <button class="quiz-option" data-value="b">模型 + 工具 + 提示词 + 状态的运行循环</button>
+            <button class="quiz-option" data-value="c">一个固定的 Python 类</button>
+            <div class="quiz-result"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="next">
+        <h2 class="section-title">下一步学习路线</h2>
+        <div class="card card-pad checklist">
+          <label><input type="checkbox"><span><b>第一轮：</b>只跑纯文本输入，理解 FastAPI、StreamingResponse、thread_id。</span></label>
+          <label><input type="checkbox"><span><b>第二轮：</b>跑图片输入，理解 OSS、Base64、视觉模型的消息格式。</span></label>
+          <label><input type="checkbox"><span><b>第三轮：</b>观察终端日志，确认 Agent 是否真的调用 Tavily。</span></label>
+          <label><input type="checkbox"><span><b>第四轮：</b>把 Tavily 从“模型自主调用”改成“后端强制调用”，比较两种 Agent 设计。</span></label>
+          <label><input type="checkbox"><span><b>第五轮：</b>接入 LangSmith 或打印更完整的 tool call trace，学习可观测性。</span></label>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      这个页面是基于当前 AI 私厨项目生成的学习资料。建议一边打开 PyCharm，一边按执行链路阅读源码。
+    </footer>
+  </div>
+
+  <script>
+    const flowDetails = {
+      browser: {
+        title: "浏览器 UI：前端仍然是你的主场",
+        body: "对应 src/app/static/index.html、app.css、app.js。这里负责图片选择、拖拽、粘贴、OSS 上传、POST 聊天请求、读取 ReadableStream 并增量渲染。你可以把它理解成一个没有框架的 React/Vue 应用。",
+        learn: "重点看 app.js 里的 uploadImage、streamChat、generateResponse。"
+      },
+      oss: {
+        title: "OSS 上传：后端签名，浏览器直传",
+        body: "对应 src/app/api/v1/oss.py。后端用阿里云 SDK 生成临时 PUT URL，浏览器直接把图片传到 OSS，后端不承接大文件上传压力。",
+        learn: "这里要理解预签名 URL、Content-Type、Bucket region、accessUrl 的区别。"
+      },
+      api: {
+        title: "FastAPI：Agent 系统的入口层",
+        body: "对应 src/app/api/v1/chat.py。ChatRequest 进入后，接口返回 StreamingResponse。真正的业务逻辑在 search_recipes 里，通过 yield 把模型输出推回前端。",
+        learn: "把它类比成 Next.js API Route + Server Sent Stream。"
+      },
+      vision: {
+        title: "视觉识别：先把图片变成结构化文字",
+        body: "对应 identify_ingredients。后端先下载 OSS 图片，转成 data:image/jpeg;base64，再调用 qwen-vl-plus 识别食材。",
+        learn: "这是为了解决模型服务端下载 OSS 图片不稳定的问题。"
+      },
+      agent: {
+        title: "Agent 决策：模型决定下一步是否用工具",
+        body: "对应 create_agent。Agent 拿到文字食材清单后，可以调用 TavilySearch，也可以直接回答。真正是否调用工具要看 tool call 日志。",
+        learn: "核心问题是可控性：让模型自主调工具，还是后端强制先查再总结。"
+      },
+      memory: {
+        title: "会话记忆：状态让 Agent 有上下文，也可能污染上下文",
+        body: "对应 SqliteSaver 和 thread_id。本项目用 thread_id:agent-text 隔离文本记忆，避免旧图片消息被重新送给模型。",
+        learn: "Agent 开发里，状态管理和工具调用一样重要。"
+      }
+    };
+
+    const flowDetail = document.querySelector("#flowDetail");
+    function renderFlowDetail(key) {
+      const item = flowDetails[key];
+      flowDetail.innerHTML = `<h3>${item.title}</h3><p>${item.body}</p><div class="callout">${item.learn}</div>`;
+    }
+    renderFlowDetail("browser");
+
+    document.querySelectorAll(".node").forEach((node) => {
+      node.addEventListener("click", () => {
+        document.querySelectorAll(".node").forEach((item) => item.classList.remove("active"));
+        node.classList.add("active");
+        renderFlowDetail(node.dataset.flow);
+      });
+    });
+
+    document.querySelectorAll(".tab").forEach((tab) => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach((item) => item.classList.remove("active"));
+        document.querySelectorAll(".code-panel").forEach((item) => item.classList.remove("active"));
+        tab.classList.add("active");
+        document.querySelector(`[data-panel="${tab.dataset.tab}"]`).classList.add("active");
+      });
+    });
+
+    const missions = [
+      { id: "model", title: "点亮模型", text: "理解 invoke 与 stream 的区别", reward: 100, skill: "Model", unlock: 0, target: "#code" },
+      { id: "prompt", title: "训练提示词", text: "找出 Agent 系统提示词的职责", reward: 120, skill: "Prompt", unlock: 100, target: "#concepts" },
+      { id: "tool", title: "装备搜索工具", text: "确认 Tavily 是如何被调用的", reward: 150, skill: "Tool", unlock: 220, target: "#pitfalls" },
+      { id: "memory", title: "获得记忆", text: "解释 thread_id 为什么重要", reward: 180, skill: "Memory", unlock: 370, target: "#runtime" },
+      { id: "runtime", title: "穿越运行时", text: "复盘一次完整请求的 6 个步骤", reward: 220, skill: "Runtime", unlock: 550, target: "#runtime" },
+      { id: "boss", title: "挑战私厨 Boss", text: "完成一次端到端 Agent 设计复盘", reward: 300, skill: "AI Chef", unlock: 770, target: "#next" }
+    ];
+    const gameKey = "agent-learning-save-v1";
+    const game = JSON.parse(localStorage.getItem(gameKey) || '{"xp":0,"done":[]}');
+    const missionBoard = document.querySelector("#missionBoard");
+    const skillList = document.querySelector("#skillList");
+    function saveGame() { localStorage.setItem(gameKey, JSON.stringify(game)); }
+    function renderGame() {
+      const level = Math.floor(game.xp / 250) + 1;
+      document.querySelector("#playerLevel").textContent = `Agent 学徒 · Lv.${level}`;
+      document.querySelector("#xpValue").textContent = game.xp;
+      document.querySelector("#xpBar").style.width = `${(game.xp % 250) / 2.5}%`;
+      document.querySelector("#missionCount").textContent = `${game.done.length} / ${missions.length}`;
+      missionBoard.innerHTML = missions.map((m) => {
+        const done = game.done.includes(m.id), locked = game.xp < m.unlock && !done;
+        return `<article class="mission ${done ? "done" : ""} ${locked ? "locked" : ""}"><small>${done ? "✓ 已完成" : locked ? `🔒 ${m.unlock} XP 解锁` : "可接受任务"}</small><h3>${m.title}</h3><p>${m.text}</p><button type="button" data-mission="${m.id}" ${locked || done ? "disabled" : ""}>${done ? "已获得 +" + m.reward + " XP" : "开始任务"}</button></article>`;
+      }).join("");
+      skillList.innerHTML = missions.map((m) => `<span class="skill ${game.done.includes(m.id) ? "unlocked" : ""}">${game.done.includes(m.id) ? "✓ " : "🔒 "}${m.skill}</span>`).join("");
+      missionBoard.querySelectorAll("[data-mission]").forEach((button) => button.addEventListener("click", () => {
+        const mission = missions.find((m) => m.id === button.dataset.mission);
+        if (!mission || game.done.includes(mission.id)) return;
+        game.done.push(mission.id); game.xp += mission.reward; saveGame(); renderGame();
+        document.querySelector(mission.target)?.scrollIntoView({ behavior: "smooth" });
+      }));
+    }
+    document.querySelector("#resetGame").addEventListener("click", () => {
+      if (!confirm("确定重置学习存档吗？")) return;
+      game.xp = 0; game.done = []; saveGame(); renderGame();
+    });
+    renderGame();
+
+    document.querySelectorAll(".quiz").forEach((quiz) => {
+      const result = quiz.querySelector(".quiz-result");
+      quiz.querySelectorAll(".quiz-option").forEach((option) => {
+        option.addEventListener("click", () => {
+          quiz.querySelectorAll(".quiz-option").forEach((item) => {
+            item.classList.remove("correct", "wrong");
+          });
+          const isCorrect = option.dataset.value === quiz.dataset.answer;
+          option.classList.add(isCorrect ? "correct" : "wrong");
+          result.textContent = isCorrect ? "正确。这个点掌握了。" : "不对。回到上面的执行链路再看一遍。";
+        });
+      });
+    });
+  </script>
+</body>
+</html>

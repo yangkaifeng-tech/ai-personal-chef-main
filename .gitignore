@@ -1,0 +1,33 @@
+# Environment variables and credentials
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local databases and runtime data
+*.db
+*.db-shm
+*.db-wal
+.langgraph_api/
+
+# IDE and local tools
+.idea/
+.vscode/
+.mcp.json
+.claude/
+
+# Logs and operating-system files
+*.log
+.DS_Store
+Thumbs.db
+
+# Notebook checkpoints
+.ipynb_checkpoints/
