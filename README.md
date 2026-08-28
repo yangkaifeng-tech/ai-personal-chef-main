@@ -1,20 +1,24 @@
 > **学习说明：本项目仿照黑马程序员的 AI 私厨项目进行学习与实践，仅用于个人学习和技术交流。**
 
-# 灶边 · AI 私厨学习 Demo
+# 网约车管理系统 + AI 管家学习 Demo
 
-一个能够识别食材图片、理解文字需求、联网检索菜谱并流式生成烹饪建议的 AI 私厨 Demo。
+一个基于 FastAPI + PostgreSQL + Vue3 + Element Plus 的后台管理系统学习项目，同时保留原有 AI 私厨管家能力。
 
-项目使用 FastAPI 提供接口，通过 LangChain / LangGraph 组织模型、联网搜索与会话记忆，并提供一套无需额外构建即可运行的响应式 Web 前端。用户可以上传冰箱或食材照片，也可以直接输入现有食材、用餐人数、口味和时间要求，让 AI 给出结构化菜谱推荐。
+后端使用 FastAPI 提供 RESTful API，业务数据默认存储在 PostgreSQL。AI 管家通过 LangChain / LangGraph 组织模型、联网搜索与会话记忆，checkpoint 默认存储 PostgreSQL，也可以通过配置切换到 SQLite。前端位于 `frontend/`，使用 Vue3、TypeScript、Element Plus、Pinia、Vue Router 实现传统后台系统。
 
 > 本仓库是个人学习成果，并非黑马程序员官方项目，与黑马程序员不存在商业或官方隶属关系。
 
 ## 功能特性
 
+- **真实登录**：默认管理员账号 `admin / admin123`，登录后使用 Bearer Token 访问后端接口。
+- **权限管理**：支持人员、角色、菜单、按钮权限 CRUD；用户对应角色，角色对应菜单和按钮。
+- **网约车管理**：支持司机管理、车辆管理 CRUD；调度管理保留占位页面。
+- **后台前端**：Vue3 + Element Plus 实现左侧菜单、顶部栏、动态菜单、按钮级权限。
 - **多模态食材输入**：支持选择、拖拽和粘贴食材图片，也支持纯文字描述。
 - **智能菜谱推荐**：结合食材、人数、时间和口味生成候选菜谱。
 - **联网搜索**：通过 Tavily 搜索参考菜谱信息。
 - **流式对话**：模型生成内容会实时显示，无需等待完整回复。
-- **会话记忆**：使用 LangGraph SQLite Checkpointer 保存当前会话。
+- **会话记忆**：业务会话和消息保存在业务数据库；LangGraph checkpoint 可配置为 PostgreSQL 或 SQLite。
 - **菜谱富文本**：支持标题、列表、表格、引用、代码和图片预览。
 - **图片预览**：识别 Markdown 图片、参考图片链接和直接图片 URL。
 - **友好的等待体验**：显示生成阶段、等待秒数，并支持停止和重新生成。
@@ -35,12 +39,12 @@
 | 分类 | 技术 |
 | --- | --- |
 | 后端 | Python 3.13、FastAPI、Uvicorn |
-| AI 编排 | LangChain、LangGraph、LangGraph SQLite Checkpointer |
+| AI 编排 | LangChain、LangGraph、LangGraph PostgreSQL/SQLite Checkpointer |
 | 模型接口 | OpenAI 兼容接口（示例使用阿里云百炼模型） |
 | 联网搜索 | Tavily Search |
 | 图片存储 | 阿里云 OSS 预签名上传 |
-| 数据存储 | SQLite |
-| 前端 | 原生 HTML、CSS、JavaScript |
+| 数据存储 | PostgreSQL 默认，SQLite 可用于本地 checkpoint |
+| 前端 | Vue3、TypeScript、Element Plus、Pinia、Vue Router、Axios |
 | 依赖管理 | uv |
 
 ## 工作流程
@@ -71,18 +75,24 @@ study_raw/
 ├─ langgraph.json              # LangGraph 配置
 ├─ .env.example                # 环境变量模板
 └─ src/
+├─ frontend/                    # Vue3 + Element Plus 后台前端
+└─ src/
    └─ app/
       ├─ main.py               # FastAPI 应用入口
       ├─ agents/
       │  └─ personal_chief.py  # AI 私厨 Agent、搜索与会话记忆
       ├─ api/v1/
-      │  ├─ chat.py            # 对话、历史记录与清空会话接口
+      │  ├─ auth.py            # 登录、当前用户、菜单权限
+      │  ├─ chat.py            # AI 管家对话、历史记录与清空会话接口
+      │  ├─ drivers.py         # 司机管理 RESTful API
+      │  ├─ vehicles.py        # 车辆管理 RESTful API
+      │  ├─ permissions.py     # 人员、角色、菜单、按钮权限管理
       │  └─ oss.py             # OSS 预签名上传接口
       ├─ models/
       │  └─ schemas.py         # Pydantic 请求模型
       ├─ common/
       │  └─ logger.py          # 日志配置
-      ├─ db/                   # 本地 SQLite 数据，运行后自动产生
+      ├─ db/                   # SQLAlchemy 模型、会话和初始化种子数据
       └─ static/
          ├─ index.html         # 前端页面结构
          ├─ app.css            # 页面视觉和响应式样式
@@ -130,30 +140,38 @@ Copy-Item .env.example .env
 
 然后编辑 `.env`，填入自己的 API Key、模型接口和 OSS 配置。请勿把 `.env` 提交到 Git。
 
-### 5. 启动服务
+### 5. 准备 PostgreSQL
 
-当前学习版的 SQLite 路径相对于 `src/app`，因此需要从该目录启动。
+默认连接：
+
+```env
+DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/personal_chef
+POSTGRES_CHECKPOINT_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/personal_chef
+CHECKPOINT_BACKEND=postgres
+```
+
+如果只是临时本地验证后端结构，可以把业务库临时改成 SQLite：
+
+```bash
+DATABASE_URL=sqlite:///./local-dev.db CHECKPOINT_BACKEND=sqlite SQLITE_CHECKPOINT_DB_PATH=./local-checkpoint.db
+```
+
+### 6. 启动 FastAPI 后端
+
+建议从项目根目录启动，并显式设置 `PYTHONPATH=src`。
 
 Windows PowerShell：
 
 ```powershell
 $env:PYTHONPATH = "$PWD\src"
-Set-Location src\app
-..\..\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001
 ```
 
 macOS / Linux：
 
 ```bash
 export PYTHONPATH="$(pwd)/src"
-cd src/app
-../../.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8001
-```
-
-浏览器访问：
-
-```text
-http://127.0.0.1:8001
+.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8001
 ```
 
 API 文档：
@@ -161,6 +179,22 @@ API 文档：
 ```text
 http://127.0.0.1:8001/docs
 ```
+
+### 7. 启动 Vue 前端
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+浏览器访问：
+
+```text
+http://127.0.0.1:5173
+```
+
+Vite 已配置代理，前端请求 `/api/v1/*` 会转发到 `http://127.0.0.1:8001`。
 
 ## 环境变量
 
@@ -170,6 +204,10 @@ http://127.0.0.1:8001/docs
 | `ALIBABA_API_URL` | 是 | OpenAI 兼容接口基础地址 |
 | `TAVILY_API_KEY` | 是 | Tavily 联网搜索密钥 |
 | `TAVILY_API_URL` | 否 | Tavily 自定义接口地址 |
+| `DATABASE_URL` | 是 | 业务数据库连接，保存用户、会话和消息，默认使用 PostgreSQL |
+| `CHECKPOINT_BACKEND` | 否 | Agent checkpoint 存储位置，可选 `postgres` 或 `sqlite`，默认 `postgres` |
+| `POSTGRES_CHECKPOINT_DATABASE_URL` | PostgreSQL checkpoint 需要 | LangGraph PostgreSQL checkpoint 连接地址 |
+| `SQLITE_CHECKPOINT_DB_PATH` | SQLite checkpoint 需要 | SQLite checkpoint 文件路径 |
 | `OSS_ACCESS_KEY_ID` | 图片功能需要 | 阿里云 OSS Access Key ID |
 | `OSS_ACCESS_KEY_SECRET` | 图片功能需要 | 阿里云 OSS Access Key Secret |
 | `OSS_BUCKET` | 图片功能需要 | OSS Bucket 名称 |
@@ -180,10 +218,10 @@ http://127.0.0.1:8001/docs
 
 ## API 概览
 
-### 流式生成菜谱
+### 登录
 
 ```http
-POST /api/v1/chat/stream
+POST /api/v1/auth/login
 Content-Type: application/json
 ```
 
@@ -191,24 +229,72 @@ Content-Type: application/json
 
 ```json
 {
-  "message": "我有两个鸡蛋和一个西红柿，想做一道十分钟内完成的菜",
-  "image_url": null,
-  "thread_id": "your-thread-id"
+  "username": "admin",
+  "password": "admin123"
 }
 ```
 
-接口以流式文本返回模型生成内容。
+登录后前端会把 `access_token` 作为 Bearer Token 发送给需要鉴权的接口。
+
+### 流式生成菜谱
+
+```http
+POST /api/v1/chat/stream
+Content-Type: application/json
+Authorization: Bearer your-token
+```
+
+请求示例：
+
+```json
+{
+  "conversation_id": null,
+  "message": "我有两个鸡蛋和一个西红柿，想做一道十分钟内完成的菜",
+  "image_url": null
+}
+```
+
+接口以 SSE 方式返回会话 ID 和流式模型内容。
 
 ### 获取会话历史
 
 ```http
-GET /api/v1/chat/messages?thread_id=your-thread-id
+GET /api/v1/chat/messages?conversation_id=your-conversation-id
 ```
 
 ### 清空会话
 
 ```http
-DELETE /api/v1/chat/messages?thread_id=your-thread-id
+DELETE /api/v1/chat/messages?conversation_id=your-conversation-id
+```
+
+### 获取用户会话列表
+
+```http
+GET /api/v1/conversations
+```
+
+### 司机和车辆
+
+```http
+GET /api/v1/drivers
+POST /api/v1/drivers
+PUT /api/v1/drivers/{driver_id}
+DELETE /api/v1/drivers/{driver_id}
+
+GET /api/v1/vehicles
+POST /api/v1/vehicles
+PUT /api/v1/vehicles/{vehicle_id}
+DELETE /api/v1/vehicles/{vehicle_id}
+```
+
+### 权限管理
+
+```http
+GET /api/v1/permissions/users
+GET /api/v1/permissions/roles
+GET /api/v1/permissions/menus
+GET /api/v1/permissions/buttons
 ```
 
 ### 获取 OSS 上传地址
@@ -219,22 +305,18 @@ GET /api/v1/oss/presign?filename=example.jpg
 
 ## 前端交互说明
 
-- `Enter`：发送消息。
-- `Shift + Enter`：输入换行。
-- 点击图片按钮：选择食材照片。
-- 拖拽图片到对话区域：添加食材照片。
-- 在输入框粘贴图片：添加剪贴板中的食材照片。
-- 停止生成：中断当前浏览器请求。
-- 重新生成：使用上一次请求再次获取回复。
-- 新对话：确认后清空当前线程并创建新的线程 ID。
+- 登录页默认填入 `admin / admin123`，可直接登录。
+- 左侧菜单由后端角色菜单权限返回。
+- 页面中的新增、编辑、删除按钮由按钮权限控制。
+- `AI管家 / 私厨管家` 支持图片上传和 SSE 流式响应。
 
 ## 数据与安全说明
 
 - `.env` 包含私密凭据，已通过 `.gitignore` 排除。
-- 本地 SQLite 数据库、WAL 文件和缓存文件不会提交到仓库。
+- 本地 SQLite checkpoint、WAL 文件和缓存文件不会提交到仓库。
 - 上传的图片会发送到配置的阿里云 OSS，请勿上传敏感或隐私图片。
 - AI 生成的菜谱仅供参考；涉及过敏、慢性疾病、特殊营养或食品安全问题时，应结合专业意见判断。
-- 当前项目定位为本地学习 Demo，没有实现账号、权限、限流和生产级审计。
+- 当前项目已实现学习版登录和 RBAC 权限，但仍未包含生产级审计、限流、刷新 token、密码找回等能力。
 
 ## 已知限制
 

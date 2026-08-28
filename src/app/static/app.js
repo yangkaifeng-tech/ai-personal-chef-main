@@ -25,9 +25,10 @@
   let busy = false;
   let dragDepth = 0;
   let lastRequest = null;
-  let threadId = localStorage.getItem("thread_id") || createId();
-  const draftKey = `ai-chef-draft:${threadId}`;
-  localStorage.setItem("thread_id", threadId);
+  const userId = localStorage.getItem("user_id") || createId();
+  let conversationId = localStorage.getItem("conversation_id") || "";
+  const draftKey = `ai-chef-draft:${userId}:${conversationId || "new"}`;
+  localStorage.setItem("user_id", userId);
 
   function createId() {
     return crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -329,23 +330,53 @@
       const response = await fetch(`${API}/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, image_url: imageUrl || null, thread_id: threadId }),
+        body: JSON.stringify({
+          user_id: userId,
+          conversation_id: conversationId || null,
+          message,
+          image_url: imageUrl || null
+        }),
         signal: activeController.signal
       });
       if (!response.ok) throw new Error("请求失败");
       if (!response.body) throw new Error("浏览器无法读取流式回复");
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
+      let buffer = "";
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
-        onChunk(decoder.decode(value, { stream: true }));
+        buffer += decoder.decode(value, { stream: true });
+        buffer = consumeSseBuffer(buffer, onChunk);
       }
-      onChunk(decoder.decode());
+      buffer += decoder.decode();
+      consumeSseBuffer(buffer, onChunk);
     } finally {
       clearTimeout(timeout);
       activeController = null;
     }
+  }
+
+  function consumeSseBuffer(buffer, onChunk) {
+    const events = buffer.split("\n\n");
+    const rest = events.pop() || "";
+    for (const eventText of events) {
+      const lines = eventText.split("\n");
+      const event = (lines.find((line) => line.startsWith("event:")) || "event: message").slice(6).trim();
+      const dataLines = lines.filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trimStart());
+      const rawData = dataLines.join("\n");
+      let payload = {};
+      try { payload = rawData ? JSON.parse(rawData) : {}; }
+      catch { payload = { content: rawData }; }
+
+      if (event === "conversation" && payload.conversation_id) {
+        conversationId = payload.conversation_id;
+        localStorage.setItem("conversation_id", conversationId);
+      } else if (event === "message") {
+        onChunk(payload.content || "");
+      }
+    }
+    return rest;
   }
 
   async function sendMessage() {
@@ -423,8 +454,11 @@
   }
 
   async function loadHistory() {
+    if (!conversationId) return;
     try {
-      const response = await fetch(`${API}/chat/messages?thread_id=${encodeURIComponent(threadId)}`);
+      const response = await fetch(
+        `${API}/chat/messages?user_id=${encodeURIComponent(userId)}&conversation_id=${encodeURIComponent(conversationId)}`
+      );
       if (!response.ok) return;
       const data = await response.json();
       for (const message of data.messages || []) {
@@ -488,9 +522,16 @@
   $("#confirmNewSessionBtn").addEventListener("click", async () => {
     newSessionDialog.close();
     activeController?.abort("new-session");
-    try { await fetch(`${API}/chat/messages?thread_id=${encodeURIComponent(threadId)}`, { method: "DELETE" }); } catch {}
-    threadId = createId();
-    localStorage.setItem("thread_id", threadId);
+    if (conversationId) {
+      try {
+        await fetch(
+          `${API}/chat/messages?user_id=${encodeURIComponent(userId)}&conversation_id=${encodeURIComponent(conversationId)}`,
+          { method: "DELETE" }
+        );
+      } catch {}
+    }
+    conversationId = "";
+    localStorage.removeItem("conversation_id");
     location.reload();
   });
   document.querySelectorAll(".suggestion").forEach((button) => {

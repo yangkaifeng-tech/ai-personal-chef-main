@@ -4,9 +4,10 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1 import chat
-from app.api.v1 import oss
+from app.api.v1 import auth, chat, drivers, oss, permissions
 from app.common.logger import setup_logging
+from app.common.logger import logger
+from app.db.session import init_db
 
 # 初始化日志配置
 setup_logging()
@@ -16,6 +17,17 @@ app = FastAPI(
     description="私厨",
     version="0.1.0"
 )
+
+
+@app.on_event("startup")
+def startup_event():
+    init_db()
+    try:
+        from app.agents.factory import get_personal_chef_runtime
+
+        get_personal_chef_runtime()
+    except Exception as error:
+        logger.error(f"AI runtime 初始化失败: {error}")
 
 # 1. 配置跨域资源共享 (CORS)
 # 插件开发中，由于请求来自浏览器扩展环境，必须正确配置 CORS
@@ -28,7 +40,10 @@ app.add_middleware(
 )
 
 # 2.挂载路由
+app.include_router(auth.router, prefix="/api/v1", tags=["认证"])
 app.include_router(chat.router, prefix="/api/v1", tags=["对话"])
+app.include_router(drivers.router, prefix="/api/v1", tags=["司机管理"])
+app.include_router(permissions.router, prefix="/api/v1", tags=["权限管理"])
 app.include_router(oss.router, prefix="/api/v1", tags=["申请上传签名url"])
 
 # 3.挂载前端资源

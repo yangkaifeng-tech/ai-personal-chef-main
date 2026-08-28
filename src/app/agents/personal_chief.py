@@ -1,3 +1,6 @@
+import asyncio
+from collections.abc import Iterator
+
 from langchain.messages import AIMessageChunk, HumanMessage, ToolMessage
 
 from app.agents.factory import get_personal_chef_runtime
@@ -25,8 +28,28 @@ def chunk_text(content) -> str:
     return ""
 
 
+def stream_agent_text(runtime, message: HumanMessage, agent_thread_id: str) -> Iterator[str]:
+    """在同步上下文中调用 LangGraph agent，并只返回可展示文本。"""
+    for chunk, metadata in runtime.agent.stream(
+            {"messages": [message]},
+            {"configurable": {"thread_id": agent_thread_id}},
+            stream_mode="messages"
+    ):
+        if isinstance(chunk, AIMessageChunk) and chunk.tool_call_chunks:
+            logger.info(f"[工具调用中]: {chunk.tool_call_chunks}")
+            continue
+        elif isinstance(chunk, ToolMessage):
+            logger.info(f"[工具调用结果]: {chunk.name}: {chunk.content}")
+            continue
+
+        if isinstance(chunk, AIMessageChunk):
+            text = chunk_text(chunk.content)
+            if text:
+                yield text
+
+
 #流式对话
-async def search_recipes(prompt: str, image: str, thread_id: str):
+async def search_recipes(prompt: str, image: str | None, thread_id: str):
     """调用agent搜索食谱"""
     runtime = get_personal_chef_runtime()
     logger.info(f"[用户】：{prompt}, image: {image}, thread_id: {thread_id}")
@@ -37,27 +60,39 @@ async def search_recipes(prompt: str, image: str, thread_id: str):
         if not image or image.strip() == "":
             message = HumanMessage(content=prompt)
         else:
-            ingredients = await identify_ingredients(runtime.model, image)
+            ingredients = await asyncio.wait_for(
+                identify_ingredients(runtime.model, image),
+                timeout=45,
+            )
             logger.info(f"[图片识别结果]: {ingredients}")
             message = HumanMessage(content=build_recipe_message(prompt, ingredients))
 
-        # 流式调用 agents
-        for chunk, metadata in runtime.agent.stream(
-                {"messages": [message]},
-                {"configurable": {"thread_id": agent_thread_id}},
-                stream_mode="messages"
-        ):
-            if isinstance(chunk, AIMessageChunk) and chunk.tool_call_chunks:
-                logger.info(f"[工具调用中]: {chunk.tool_call_chunks}")
-                continue
-            elif isinstance(chunk, ToolMessage):
-                logger.info(f"[工具调用结果]: {chunk.name}: {chunk.content}")
-                continue
+        queue: asyncio.Queue[str | Exception | None] = asyncio.Queue()
+        loop = asyncio.get_running_loop()
 
-            if isinstance(chunk, AIMessageChunk):
-                text = chunk_text(chunk.content)
-                if text:
-                    yield text
+        def run_blocking_stream() -> None:
+            try:
+                for text in stream_agent_text(runtime, message, agent_thread_id):
+                    loop.call_soon_threadsafe(queue.put_nowait, text)
+            except Exception as error:
+                loop.call_soon_threadsafe(queue.put_nowait, error)
+            finally:
+                loop.call_soon_threadsafe(queue.put_nowait, None)
+
+        task = asyncio.create_task(asyncio.to_thread(run_blocking_stream))
+        while True:
+            try:
+                item = await asyncio.wait_for(queue.get(), timeout=120)
+            except asyncio.TimeoutError:
+                logger.error("[错误]: AI 响应超过 120 秒仍未返回内容")
+                yield "AI 响应超时，请稍后重试，或先用文字描述食材。"
+                return
+            if item is None:
+                break
+            if isinstance(item, Exception):
+                raise item
+            yield item
+        await task
 
     except Exception as e:
         logger.error(f"\n[错误]: {str(e)}")
