@@ -41,6 +41,8 @@ jobs:
           APP_USER=rideops
           BRANCH=feature-demo
 
+          # 部署通过 root 登录，但代码目录由 rideops 持有；显式信任该固定目录。
+          git config --global --add safe.directory "$APP_DIR"
           cd "$APP_DIR"
           git fetch origin "$BRANCH"
           git checkout "$BRANCH"
