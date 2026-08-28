@@ -63,7 +63,7 @@ function renderableChildren(menu: MenuItem) {
       <div class="brand">
         <div class="brand-mark">网</div>
         <div>
-          <div class="brand-title">网约车管理系统</div>
+          <div class="brand-title">网约车管理系统123</div>
           <div class="brand-subtitle">Ride Ops Console</div>
         </div>
       </div>
