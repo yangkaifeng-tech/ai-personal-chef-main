@@ -101,6 +101,20 @@ study_raw/
 
 ## 本地运行
 
+## GitHub Actions 自动部署
+
+推送到 `feature-demo` 分支后，GitHub Actions 会通过 SSH 部署到阿里云服务器：拉取代码、同步 Python 依赖、构建 Vue 前端、重启 `ride-ops-api` 并执行健康检查。
+
+首次配置只需在 GitHub 仓库的 **Settings → Secrets and variables → Actions** 添加以下 Secrets：
+
+| Secret | 值 |
+| --- | --- |
+| `DEPLOY_HOST` | 服务器公网 IP，例如 `8.130.209.205` |
+| `DEPLOY_USER` | `root`（或配置了免密 sudo 的专用部署用户） |
+| `DEPLOY_SSH_PRIVATE_KEY` | 用于登录服务器的私钥完整内容 |
+
+服务器还需要将相应公钥写入该用户的 `~/.ssh/authorized_keys`。部署配置见 `.github/workflows/deploy.yml`；也可从 Actions 页面手动运行 **Deploy to Alibaba Cloud**。
+
 ### 1. 前置条件
 
 - Python 3.13 或更高版本

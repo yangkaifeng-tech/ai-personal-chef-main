@@ -1,0 +1,63 @@
+name: Deploy to Alibaba Cloud
+
+on:
+  push:
+    branches: [feature-demo]
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Configure SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          printf 'Host ride-ops-production\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/id_ed25519\n  StrictHostKeyChecking yes\n' \
+            "$DEPLOY_HOST" "$DEPLOY_USER" >> ~/.ssh/config
+
+      - name: Deploy application
+        run: |
+          ssh ride-ops-production 'bash -s' <<'REMOTE_SCRIPT'
+          set -euo pipefail
+
+          APP_DIR=/opt/ride-ops
+          APP_USER=rideops
+          BRANCH=feature-demo
+
+          cd "$APP_DIR"
+          git fetch origin "$BRANCH"
+          git checkout "$BRANCH"
+          git pull --ff-only origin "$BRANCH"
+          chown -R "$APP_USER:$APP_USER" "$APP_DIR"
+
+          sudo -u "$APP_USER" -H bash -lc '
+            set -euo pipefail
+            export PATH="$HOME/.local/bin:$PATH"
+            cd /opt/ride-ops
+            uv sync --frozen --no-install-project
+            cd frontend
+            npm ci
+            npm run build
+          '
+
+          systemctl restart ride-ops-api
+          systemctl is-active --quiet ride-ops-api
+          curl --fail --silent --show-error http://127.0.0.1:8001/docs >/dev/null
+          REMOTE_SCRIPT

@@ -1,6 +1,19 @@
 import { apiClient } from './client'
 import type { ChatMessage, ConversationInfo } from '../types/api'
 
+/**
+ * `crypto.randomUUID()` 仅能在安全上下文（HTTPS 或 localhost）中使用。
+ * 线上用裸 IP 的 HTTP 访问时浏览器会禁用它，因此保留安全 UUID，
+ * 并提供只用于 OSS 文件名的兼容随机后缀。
+ */
+function createUploadId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
+}
+
 export async function fetchConversations(): Promise<{ conversations: ConversationInfo[] }> {
   const { data } = await apiClient.get<{ conversations: ConversationInfo[] }>('/conversations')
   return data
@@ -25,13 +38,16 @@ export async function presignImage(filename: string): Promise<{
 }
 
 export async function uploadImage(file: File): Promise<string> {
-  const filename = `${Date.now()}-${crypto.randomUUID()}.${file.name.split('.').pop() || 'jpg'}`
+  const filename = `${Date.now()}-${createUploadId()}.${file.name.split('.').pop() || 'jpg'}`
   const presign = await presignImage(filename)
-  await fetch(presign.uploadUrl, {
+  const response = await fetch(presign.uploadUrl, {
     method: 'PUT',
     headers: { 'Content-Type': presign.contentType },
     body: file,
   })
+  if (!response.ok) {
+    throw new Error(`图片上传失败：${response.status}`)
+  }
   return presign.accessUrl
 }
 
