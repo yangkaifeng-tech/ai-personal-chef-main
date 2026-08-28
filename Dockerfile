@@ -6,9 +6,14 @@ WORKDIR /app
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH=/app/src
+    PYTHONPATH=/app/src \
+    PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple \
+    PIP_DEFAULT_TIMEOUT=60 \
+    PIP_RETRIES=5 \
+    UV_INDEX_URL=https://mirrors.aliyun.com/pypi/simple
 
-# uv uses the committed lockfile to create a reproducible production environment.
+# The production host cannot reliably reach PyPI.  Use the Alibaba Cloud mirror
+# for both bootstrapping uv and resolving the locked application dependencies.
 RUN pip install --no-cache-dir uv
 
 COPY pyproject.toml uv.lock ./
