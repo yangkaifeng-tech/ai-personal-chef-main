@@ -60,6 +60,17 @@ jobs:
           '
 
           systemctl restart ride-ops-api
-          systemctl is-active --quiet ride-ops-api
-          curl --fail --silent --show-error http://127.0.0.1:8001/docs >/dev/null
+          for attempt in {1..15}; do
+            if systemctl is-active --quiet ride-ops-api \
+              && curl --fail --silent http://127.0.0.1:8001/docs >/dev/null 2>&1; then
+              echo "Deployment health check passed."
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Backend did not become healthy within 30 seconds."
+          systemctl status ride-ops-api --no-pager || true
+          journalctl -u ride-ops-api -n 100 --no-pager || true
+          exit 1
           REMOTE_SCRIPT
