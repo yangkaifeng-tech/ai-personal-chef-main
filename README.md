@@ -111,9 +111,9 @@ study_raw/
 | --- | --- |
 | `DEPLOY_HOST` | 服务器公网 IP，例如 `8.130.209.205` |
 | `DEPLOY_USER` | `root`（或配置了免密 sudo 的专用部署用户） |
-| `DEPLOY_SSH_PRIVATE_KEY` | 用于登录服务器的私钥完整内容 |
+| `DEPLOY_SSH_PRIVATE_KEY_B64` | 用于登录服务器的私钥 Base64 编码结果 |
 
-服务器还需要将相应公钥写入该用户的 `~/.ssh/authorized_keys`。部署配置见 `.github/workflows/deploy.yml`；也可从 Actions 页面手动运行 **Deploy to Alibaba Cloud**。
+服务器还需要将相应公钥写入该用户的 `~/.ssh/authorized_keys`。在服务器执行 `base64 -w 0 /root/.ssh/github-actions-ride-ops`，将整行输出复制到 `DEPLOY_SSH_PRIVATE_KEY_B64`，不要添加引号或空格。部署配置见 `.github/workflows/deploy.yml`；也可从 Actions 页面手动运行 **Deploy to Alibaba Cloud**。
 
 ### 1. 前置条件
 
