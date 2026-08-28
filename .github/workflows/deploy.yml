@@ -49,19 +49,22 @@ jobs:
           git pull --ff-only origin "$BRANCH"
           chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 
+          # 前端仍由宿主机 Nginx 托管，因此在宿主机构建静态文件。
           sudo -u "$APP_USER" -H bash -lc '
             set -euo pipefail
-            export PATH="$HOME/.local/bin:$PATH"
             cd /opt/ride-ops
-            uv sync --frozen --no-install-project
             cd frontend
             npm ci
             npm run build
           '
 
-          systemctl restart ride-ops-api
+          # 后端改由 Docker Compose 托管。首次迁移时停用旧的 systemd 服务，
+          # 防止它与容器争用 127.0.0.1:8001。
+          systemctl disable --now ride-ops-api || true
+          docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
+
           for attempt in {1..15}; do
-            if systemctl is-active --quiet ride-ops-api \
+            if [ "$(docker inspect -f '{{.State.Running}}' ride-ops-api 2>/dev/null || true)" = "true" ] \
               && curl --fail --silent http://127.0.0.1:8001/docs >/dev/null 2>&1; then
               echo "Deployment health check passed."
               exit 0
@@ -70,7 +73,7 @@ jobs:
           done
 
           echo "Backend did not become healthy within 30 seconds."
-          systemctl status ride-ops-api --no-pager || true
-          journalctl -u ride-ops-api -n 100 --no-pager || true
+          docker compose -f docker-compose.prod.yml ps || true
+          docker compose -f docker-compose.prod.yml logs --tail=100 api || true
           exit 1
           REMOTE_SCRIPT
