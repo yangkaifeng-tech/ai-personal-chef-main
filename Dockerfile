@@ -1,4 +1,6 @@
-FROM python:3.13-slim
+# Docker Hub is unreliable from the production server; this mirror was
+# verified there with `docker pull docker.m.daocloud.io/library/python:3.13-slim`.
+FROM docker.m.daocloud.io/library/python:3.13-slim
 
 WORKDIR /app
 
